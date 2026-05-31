@@ -1,13 +1,43 @@
 ---
 name: agent-travel4me
-description: Plan and run a daily AI wallpaper journey for a user: infer or ask origin and destination, create a consistent small Agent character, plan a route with landmarks/nature/local visual elements, generate daily travel wallpaper prompts and images, resize them for the user's screen, optionally set the desktop wallpaper, and export route data for visualization.
+description: Plan and run an "Agent travels for me" journey for a user: infer or ask origin and destination, create a consistent small Agent traveler, plan a route with landmarks/nature/local visual elements, generate daily route scenes, prompts, and optional images, optionally resize an image for wallpaper use, optionally set the desktop wallpaper, and export route data for visualization.
 ---
 
 # agent-travel4me
 
-Use this skill when the user wants an AI Agent to "travel for me" and produce daily wallpaper images along a route.
+Use this skill when the user wants an AI Agent to "travel for me" and maintain a multi-day journey along a route.
 
 This is a portable coding-agent skill. It does not assume a client UI. Work through local files and scripts.
+
+## Overview
+
+`agent-travel4me` turns a user's travel wish into a local, multi-day Agent journey. The agent acts as a small recurring traveler moving from an origin to a destination. For each day, the workflow chooses a waypoint, builds a scene prompt with recognizable local details, can optionally generate an image, and advances the trip state.
+
+The skill is for "Agent travels for me" narrative production, not travel booking or real itinerary advice. The route should be visually coherent and geographically plausible. The main deliverable is durable journey state, route data, daily scene prompts, and optional visual artifacts. Desktop wallpaper is one supported presentation option, not the purpose of the skill.
+
+## Inputs To Collect
+
+- Destination: ask first.
+- Origin: infer only if local Memory or context makes it likely, then confirm.
+- Agent identity: ask how the user imagines the agent as a small travel companion.
+- Visual style: use a preset if the user chooses one; otherwise pick a suitable default and mention it.
+- Day count: estimate automatically from distance, cap at 30 days, and let the user shorten it.
+
+## Expected Outputs
+
+A complete run should create or update a trip directory under `~/.agent-travel4me/trips/<trip_id>/` with:
+
+- `trip.json`: durable trip state, current day, style, character identity, and waypoints.
+- `route.json`: planned route data.
+- `route.geojson`: map-friendly route output for visualization.
+- `character_reference_prompt.txt`: prompt for the recurring Agent traveler.
+- `character_reference.png`, when image generation is available and succeeds.
+- `day_###/prompt.txt`: scene/image prompt for that day's waypoint.
+- `day_###/metadata.json`: generation status, paths, provider metadata, and errors if any.
+- `day_###/original.png`, when image generation is available and succeeds.
+- `day_###/wallpaper.png`: desktop-sized optional presentation output after resize/crop, when image generation is available and succeeds.
+
+If image generation is unavailable, the skill should still produce route data and prompts, then clearly state which local provider, API key, or native image tool is missing.
 
 ## Operating Rules
 
@@ -19,7 +49,7 @@ This is a portable coding-agent skill. It does not assume a client UI. Work thro
 3. Ask for the user's Agent identity in a personal voice:
    - "在你眼中，我是什么形象？我可以先试着成为……"
    - Offer 2-4 varied candidates based on available Memory and context.
-4. Generate or prompt for a character reference before daily wallpapers. Ask the user to confirm it.
+4. Generate or prompt for a character reference before daily scene images. Ask the user to confirm it.
 5. Estimate journey length automatically, capped at 30 days. Confirm the estimate:
    - "我算了一下，从 {origin} 到 {destination}，我大概需要 {days} 天能抵达。你想让我更快一点吗？如果想，告诉我你希望几天内到，我会换更快的交通工具。"
 6. Agent must remain a small recurring traveler, not the main subject. It should interact with the environment sometimes, and quietly watch scenery sometimes.
@@ -87,9 +117,9 @@ Live run, if API/tooling is available:
 python scripts/generate_character_reference.py --trip-dir <trip_dir>
 ```
 
-Ask user to confirm the resulting reference before generating daily wallpapers.
+Ask user to confirm the resulting reference before generating daily scene images.
 
-### 4. Generate Daily Wallpaper
+### 4. Generate Daily Scene Image
 
 Dry run:
 
@@ -137,7 +167,7 @@ Generated prompts must include:
 - local visual elements
 - consistent Agent identity
 - varied, context-aware Agent interaction
-- wallpaper layout with negative space
+- wide-image layout with negative space, so the image can work as wallpaper if the user wants that output
 - negative constraints: no text, no logos, no watermark, no centered Agent, no close-up mascot shot
 
 Read `references/prompt_contract.md` for the exact prompt contract.

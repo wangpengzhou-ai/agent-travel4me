@@ -9,3 +9,10 @@ env/
 .env.*
 !.env.example
 .agent-travel4me/
+node_modules/
+dist/
+artifacts/
+agent-travel-web/
+codex-conversations/raw/
+codex-conversations/index.md
+codex-conversations/index.tsv
