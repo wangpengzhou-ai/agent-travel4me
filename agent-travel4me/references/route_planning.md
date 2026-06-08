@@ -1,6 +1,6 @@
 # Route Planning
 
-Routes are narrative wallpaper routes, not travel advice.
+Routes are narrative wallpaper routes for visual storytelling.
 
 ## Day Cap
 
@@ -35,6 +35,24 @@ Persist both:
 
 - `trip.json`
 - `route.geojson`
+
+## Validation Gate
+
+Before live image generation, run:
+
+```bash
+python scripts/validate_route.py --trip-dir <trip_dir>
+```
+
+Block live image generation when validation reports unresolved placeholders, missing coordinates, missing landmarks, too few natural/semi-natural days, or three consecutive city-only days. Dry-run prompt generation is still allowed for debugging.
+
+When a host agent enriches the route, write the enriched route as JSON and apply it with:
+
+```bash
+python scripts/apply_route_enrichment.py --trip-dir <trip_dir> --route <enriched_route.json>
+```
+
+The enriched route must pass `validate_route.py` before it replaces `trip.json`, `route.json`, and `route.geojson`.
 
 ## Selection Strategy
 

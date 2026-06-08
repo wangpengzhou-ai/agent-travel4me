@@ -8,17 +8,32 @@ from common import load_trip, write_json, write_text
 from image_providers import ImageProviderError, generate_image
 
 
-def build_character_prompt(character: str, style: str) -> str:
-    return "\n".join(
+def build_character_prompt(character: dict | str, style: str) -> str:
+    if isinstance(character, dict):
+        description = character.get("description", "")
+        anchors = character.get("visual_anchors") or []
+        rules = character.get("consistency_rules") or []
+    else:
+        description = str(character)
+        anchors = [description]
+        rules = []
+    lines = [
+        "Create a character reference image for agent-travel4me.",
+        f"Character: {description}.",
+    ]
+    if anchors:
+        lines.append("Fixed visual anchors: " + "; ".join(str(anchor) for anchor in anchors) + ".")
+    if rules:
+        lines.append("Identity lock: " + "; ".join(str(rule) for rule in rules) + ".")
+    lines.extend(
         [
-            "Create a character reference image for agent-travel4me.",
-            f"Character: {character}.",
             "The character should be a small travel companion with clear recurring visual anchors.",
             "Show full body, three-quarter view, simple neutral travel backdrop, no text, no logos, no watermark.",
             "Keep the design suitable for reuse as a tiny recurring traveler in scenic wallpaper images.",
             f"Rendering style hint: {style}.",
         ]
     )
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -29,7 +44,7 @@ def main() -> None:
     args = parser.parse_args()
     trip_dir = Path(args.trip_dir)
     trip = load_trip(trip_dir)
-    character = trip["character"]["description"]
+    character = trip["character"]
     prompt = build_character_prompt(character, trip.get("style", "watercolor_postcard"))
     write_text(trip_dir / "character_reference_prompt.txt", prompt + "\n")
     metadata = {"prompt_path": str(trip_dir / "character_reference_prompt.txt"), "dry_run": args.dry_run}

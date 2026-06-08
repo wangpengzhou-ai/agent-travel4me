@@ -6,8 +6,9 @@ from pathlib import Path
 
 from common import load_trip, read_json, utc_now, write_json, write_text
 from image_providers import ImageProviderError, generate_image
-from prompt_wallpaper import build_wallpaper_prompt
+from prompt_wallpaper import build_prompt_context, build_wallpaper_prompt
 from resize_wallpaper import resize_wallpaper
+from validate_route import validate_daily_context, validate_route
 
 
 def generate_for_day(trip_dir: Path, day: int, size: str = "2560x1440", dry_run: bool = False) -> dict:
@@ -16,17 +17,29 @@ def generate_for_day(trip_dir: Path, day: int, size: str = "2560x1440", dry_run:
     day_dir = trip_dir / f"day_{day:03d}"
     day_dir.mkdir(parents=True, exist_ok=True)
     prompt = build_wallpaper_prompt(trip, waypoint)
+    prompt_context = build_prompt_context(trip, waypoint)
     write_text(day_dir / "prompt.txt", prompt + "\n")
 
     metadata = {
         "day": day,
         "location": waypoint["location"],
+        "label_text": prompt_context["label_text"],
+        "label_date": prompt_context["label_date"],
+        "weather": waypoint.get("weather"),
         "created_at": utc_now(),
         "prompt_path": str(day_dir / "prompt.txt"),
         "size": size,
         "dry_run": dry_run,
     }
     if dry_run:
+        write_json(day_dir / "metadata.json", metadata)
+        return metadata
+
+    validation_issues = validate_route(trip)
+    validation_issues.extend(validate_daily_context(trip, day))
+    if validation_issues:
+        metadata["status"] = "blocked_route_or_daily_context_invalid"
+        metadata["issues"] = validation_issues
         write_json(day_dir / "metadata.json", metadata)
         return metadata
 
