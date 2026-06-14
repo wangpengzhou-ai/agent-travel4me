@@ -19,6 +19,8 @@ def apply_route_enrichment(trip_dir: Path, route_path: Path) -> dict:
     trip["days"] = route["days"]
     trip["direct_distance_km"] = route.get("direct_distance_km")
     trip["route_distance_km"] = route.get("route_distance_km")
+    trip["day_count_source"] = route.get("day_count_source")
+    trip["requested_target_days"] = route.get("requested_target_days")
     trip["waypoints"] = route["waypoints"]
     trip["route_enriched"] = True
     trip["route_enrichment_source"] = str(route_path)

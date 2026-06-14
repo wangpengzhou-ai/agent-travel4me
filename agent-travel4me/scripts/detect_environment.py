@@ -21,7 +21,16 @@ def provider_status() -> dict[str, Any]:
     if os.environ.get("SEEDREAM_API_KEY") or os.environ.get("TRAVEL4ME_IMAGE_COMMAND"):
         providers.append({"name": "seedream", "model": os.environ.get("SEEDREAM_MODEL", "latest"), "priority": 3})
     providers.sort(key=lambda x: x["priority"])
-    return {"native_image_tool_hint": native, "available_api_providers": providers, "selected_api_provider": providers[0] if providers else None}
+    return {
+        "native_image_tool_hint": native,
+        "host_native_strategy": {
+            "python_can_verify": False,
+            "probe": "attempt_first_required_image_with_host_tool",
+            "fallback": "local_api_provider_or_prompt_only",
+        },
+        "available_api_providers": providers,
+        "selected_api_provider": providers[0] if providers else None,
+    }
 
 
 def desktop_session() -> dict[str, Any]:
@@ -64,7 +73,12 @@ def automation_status() -> dict[str, Any]:
             candidates.append("systemd_timer")
         if shutil.which("crontab"):
             candidates.append("cron")
-    return {"available": bool(candidates), "candidates": candidates}
+    return {
+        "available": bool(candidates),
+        "candidates": candidates,
+        "default_action": "create_daily_automation_after_trip_initialization" if candidates else "manual_daily_run_until_configured",
+        "ask_user_first": False,
+    }
 
 
 def detect_environment() -> dict[str, Any]:

@@ -149,15 +149,19 @@ def _interpolate(start: dict[str, float], end: dict[str, float], t: float) -> di
     }
 
 
-def _day_count(origin_coords: dict[str, float] | None, destination_coords: dict[str, float] | None, target_days: int | None) -> tuple[int, int | None]:
+def _day_count(
+    origin_coords: dict[str, float] | None,
+    destination_coords: dict[str, float] | None,
+    target_days: int | None,
+) -> tuple[int, int | None, str]:
     distance = None
     if origin_coords and destination_coords:
         distance = round(haversine_km((origin_coords["lat"], origin_coords["lon"]), (destination_coords["lat"], destination_coords["lon"])))
     if target_days:
-        return max(3, min(30, target_days)), distance
+        return max(3, min(30, target_days)), distance, "user_target"
     if distance is not None:
-        return estimate_days(distance), distance
-    return 12, None
+        return estimate_days(distance), distance, "distance_estimate"
+    return 12, None, "fallback_no_coordinates"
 
 
 def _landscape_for(day_index: int, total_days: int) -> dict[str, Any]:
@@ -217,6 +221,7 @@ def plan_route(
         "target_days": target_days,
         "requirements": {
             "max_days": 30,
+            "day_count_policy": "25-30 days for cross-continent, polar, or over-8000km routes unless user_target is explicit",
             "include_coordinates": True,
             "include_landmarks": True,
             "avoid_three_city_days": True,
@@ -234,7 +239,7 @@ def plan_route(
     if external:
         return external
 
-    days, direct_distance = _day_count(origin_coords, destination_coords, target_days)
+    days, direct_distance, day_count_source = _day_count(origin_coords, destination_coords, target_days)
     start = origin_coords or {"lat": 0.0, "lon": 0.0}
     end = destination_coords or {"lat": 0.0, "lon": 0.0}
     has_real_coords = origin_coords is not None and destination_coords is not None
@@ -293,6 +298,8 @@ def plan_route(
         "days": days,
         "direct_distance_km": direct_distance,
         "route_distance_km": route_distance,
+        "day_count_source": day_count_source,
+        "requested_target_days": target_days,
         "human_interaction_policy": {
             "default": "include a local person interaction on each day",
             "max_no_human_interaction_ratio": 0.2,

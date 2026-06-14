@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from common import load_trip, print_json, read_json
+from common import haversine_km, load_trip, print_json, read_json
 
 
 REQUIRED_WAYPOINT_FIELDS = [
@@ -68,6 +68,39 @@ def _valid_coordinates(value: Any) -> bool:
     if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
         return False
     return -90 <= lat <= 90 and -180 <= lon <= 180
+
+
+def _distance_from_route(route_or_trip: dict[str, Any], waypoints: list[dict[str, Any]]) -> float | None:
+    distances = [
+        route_or_trip.get("route_distance_km"),
+        route_or_trip.get("direct_distance_km"),
+    ]
+    numeric = [float(value) for value in distances if isinstance(value, (int, float)) and value > 0]
+    if numeric:
+        return max(numeric)
+    if len(waypoints) < 2:
+        return None
+    first = waypoints[0].get("coordinates")
+    last = waypoints[-1].get("coordinates")
+    if _valid_coordinates(first) and _valid_coordinates(last):
+        return haversine_km((first["lat"], first["lon"]), (last["lat"], last["lon"]))
+    return None
+
+
+def _minimum_days_for_distance(distance_km: float) -> int:
+    if distance_km <= 100:
+        return 3
+    if distance_km <= 800:
+        return 5
+    if distance_km <= 2500:
+        return 9
+    if distance_km <= 8000:
+        return 15
+    return 25
+
+
+def _user_requested_day_count(route_or_trip: dict[str, Any]) -> bool:
+    return route_or_trip.get("day_count_source") == "user_target" or bool(route_or_trip.get("user_requested_fast_arrival"))
 
 
 def _is_city_only(waypoint: dict[str, Any]) -> bool:
@@ -143,6 +176,21 @@ def validate_route_report(route_or_trip: dict[str, Any]) -> dict[str, list[str]]
         return {"errors": ["route has no waypoints"], "warnings": []}
     if len(waypoints) != days:
         errors.append(f"route has {len(waypoints)} waypoints but days is {days}")
+
+    distance_km = _distance_from_route(route_or_trip, waypoints)
+    if distance_km is not None:
+        minimum_days = _minimum_days_for_distance(distance_km)
+        if days < minimum_days:
+            issue = (
+                f"route has {days} days for about {round(distance_km)} km; "
+                f"expected at least {minimum_days} days unless the user explicitly requested faster arrival"
+            )
+            if _user_requested_day_count(route_or_trip):
+                warnings.append(issue)
+            else:
+                errors.append(issue)
+    elif route_or_trip.get("day_count_source") == "fallback_no_coordinates":
+        warnings.append("day count uses fallback_no_coordinates and should not be treated as a final distance estimate")
 
     natural_days = 0
     no_human_interaction_days = 0

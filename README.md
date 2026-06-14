@@ -4,7 +4,7 @@
 
 `agent-travel4me` 是一个面向编码代理的“Agent 替我旅行”Skill。它会根据用户给定的出发地、目的地和 Agent 形象，规划一条多日旅程，并以明信片风格为每天生成路线状态、地点信息、场景提示词和可选图片产物。
 
-这个项目提供一套可移植的本地工作流：编码代理可以调用脚本检测环境、初始化旅程、生成角色参考图、逐日推进路线、生成当天场景素材，并在用户明确允许后把图片作为桌面壁纸使用。
+这个项目提供一套可移植的本地工作流：编码代理可以调用脚本检测环境、初始化旅程、生成角色参考图、创建每日自动运行计划、逐日推进路线、生成当天场景素材，并在用户明确允许后把图片作为桌面壁纸使用。
 
 ### 主要能力
 
@@ -13,7 +13,7 @@
 - 维护小型、连续出现的 Agent 旅行者形象，让它每天尽量参与当地特色活动，并与当地人产生小互动。
 - 输出每日场景提示词、路线 GeoJSON、地点/日期标签、天气上下文和可选图片文件。
 - 支持宿主 coding agent 原生生图、本地 OpenAI/Gemini/Seedream Provider，或外部命令形式的图片生成 Provider。
-- 可选地安装每日自动运行计划，或在用户授权后设置本机壁纸。
+- 默认创建每日自动运行计划；设置本机壁纸仍需要用户授权。
 
 ### 目录结构
 
@@ -57,17 +57,19 @@ python scripts/daily_run.py \
   --dry-run
 ```
 
-实时图片生成有两条路径：如果宿主 coding agent 有原生生图能力，使用 dry-run 产出的 prompt 生图，再用 `scripts/import_generated_image.py` 登记结果；如果没有原生生图能力，则通过本地环境变量配置 `OPENAI_API_KEY`、`GOOGLE_API_KEY`、`GEMINI_API_KEY`、`SEEDREAM_API_KEY` 或 `TRAVEL4ME_IMAGE_COMMAND`。
+实时图片生成有两条路径：如果宿主 coding agent 有原生生图能力，用第一次真实需要的图片生成来验证能力，例如角色参考图或当天场景图；成功后使用 dry-run 产出的 prompt 生图，再用 `scripts/import_generated_image.py` 登记结果。如果原生生图调用失败或没有原生能力，则通过本地环境变量配置 `OPENAI_API_KEY`、`GOOGLE_API_KEY`、`GEMINI_API_KEY`、`SEEDREAM_API_KEY` 或 `TRAVEL4ME_IMAGE_COMMAND`。
 
 天气是可选增强信息。生成最终明信片、每日场景图或壁纸前，如果已经查询到或用户提供了当天当地天气，可以通过 `--weather` 或 `waypoint.weather` 写入 prompt；缺天气时继续生成，不阻塞流程。
 
 如果 `validate_route.py` 报告路线仍是占位内容，先让 coding agent 补齐真实地点、坐标、地标、视觉元素，并把具体的当地活动和人际互动直接写进路线，再用 `scripts/apply_route_enrichment.py` 写回旅程状态。
 
+完整路线默认只写入本地状态文件。面向用户的旅行叙事只展示当天、已走过地点、总天数和大方向；未来站点和完整表格只在用户明确要求查看或导出时展示。
+
 ## English
 
 `agent-travel4me` is a coding-agent skill for running an "Agent travels for me" journey. Given an origin, destination, and Agent identity, it plans a multi-day route and produces durable journey state, postcard-style daily scene prompts, route data, and optional image artifacts.
 
-The project is intentionally local and portable. A coding agent can run the scripts to detect the environment, initialize a trip, generate a character reference, advance the daily route, produce scene assets, resize outputs, and set the desktop wallpaper only after explicit user approval.
+The project is intentionally local and portable. A coding agent can run the scripts to detect the environment, initialize a trip, create the daily automation, generate a character reference, advance the daily route, produce scene assets, resize outputs, and set the desktop wallpaper only after explicit user approval.
 
 ### Key Features
 
@@ -76,7 +78,7 @@ The project is intentionally local and portable. A coding agent can run the scri
 - Keeps a small recurring Agent traveler consistent across daily scenes, usually joining local activities and interacting with local people.
 - Exports daily scene prompts, route GeoJSON, place/date labels, weather context, and optional generated images.
 - Supports host-agent native image generation, local OpenAI/Gemini/Seedream providers, or a custom command hook.
-- Can optionally install a daily run schedule or set the local wallpaper after user approval.
+- Creates a daily run schedule by default; setting the local wallpaper still requires user approval.
 
 ### Repository Layout
 
@@ -120,8 +122,10 @@ python scripts/daily_run.py \
   --dry-run
 ```
 
-Live image generation has two paths: if the host coding agent has native image generation, use the dry-run prompt and then register the generated image with `scripts/import_generated_image.py`; otherwise configure local environment variables such as `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `SEEDREAM_API_KEY`, or `TRAVEL4ME_IMAGE_COMMAND`.
+Live image generation has two paths: if the host coding agent has native image generation, prove it with the first real required image generation, such as the character reference or the current day's scene, then register the generated image with `scripts/import_generated_image.py` when a local path is available. If the host-native call fails or no native image tool exists, configure local environment variables such as `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `SEEDREAM_API_KEY`, or `TRAVEL4ME_IMAGE_COMMAND`.
 
 Weather is optional enhancement context. Before generating final postcards, daily scene images, or wallpapers, write the day's local weather into the prompt through `--weather` or `waypoint.weather` when it is already available or user-provided; missing weather does not block generation.
 
 If `validate_route.py` reports placeholder route content, ask the coding agent to enrich the route with real places, coordinates, landmarks, local visual elements, and place-specific local activities and human interactions written directly into the route, then apply it with `scripts/apply_route_enrichment.py`.
+
+The full route is internal state by default. User-facing journey narration should reveal only the current day, already visited places, total day count, and broad direction; future stops or full route tables are shown only when the user explicitly asks.

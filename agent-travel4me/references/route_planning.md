@@ -6,6 +6,14 @@ Routes are narrative wallpaper routes for visual storytelling.
 
 Maximum journey length is 30 days. If a distance estimate exceeds 30 days, cap it at 30.
 
+Routes longer than 8000 km, polar routes, and cross-continent routes should normally estimate 25-30 days unless the user explicitly asks for a faster compressed journey. Do not treat a no-coordinate fallback as a trustworthy final estimate for a very long route.
+
+Set `day_count_source` on the route:
+
+- `distance_estimate`: default estimate from real coordinates or distance.
+- `fallback_no_coordinates`: temporary fallback only; enrich before live generation.
+- `user_target`: user explicitly requested a faster or custom day count.
+
 After estimating, confirm with the user:
 
 ```text
@@ -91,6 +99,12 @@ Rules:
 8. For 25-30 day routes, include at least 10 natural or semi-natural days.
 9. Store coordinates for later website visualization.
 10. If the user wants faster arrival, remove similar intermediate nodes and keep major geographic transitions.
+
+## User-Facing Reveal Rule
+
+The complete route is internal state for generation and automation. By default, reveal only the current day, already visited places, total day count, and broad journey direction. Do not show future waypoint names, landmarks, or a full route table unless the user explicitly asks to see or export the full route.
+
+For a durable trip, generate the current due day by default. Do not proactively offer to continue or generate all remaining days. If the user explicitly asks for a manual catch-up, preview, or bulk generation, it is allowed after route validation.
 
 Bad examples:
 

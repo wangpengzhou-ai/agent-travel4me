@@ -12,6 +12,7 @@ Important distinction:
 Detection outputs:
 
 - `native_image_tool_hint`: whether the surrounding agent likely has direct image generation. The value can also be supplied by environment variable `TRAVEL4ME_NATIVE_IMAGE_TOOL=1`. This is only a local hint; Python cannot inspect the active host agent's tool list.
+- `host_native_strategy`: what to do when the host may have native image tools. Python cannot prove this capability; the host agent should attempt the first real required image generation and treat that tool call as the probe.
 - `provider.available_api_providers`: API providers available by environment variables.
 - `provider.selected_api_provider`: highest-priority available local API provider, when one exists.
 - `desktop_session`: whether DISPLAY/Wayland/macOS Aqua/Windows session hints exist.
@@ -25,4 +26,6 @@ Local API provider priority:
 2. Nano Banana 2 / Gemini image model with `GOOGLE_API_KEY` or `GEMINI_API_KEY`.
 3. Seedream latest configured model with `SEEDREAM_API_KEY` or `TRAVEL4ME_IMAGE_COMMAND`.
 
-When a native host image tool can satisfy the task, use it before requesting local API-provider setup, even if `native_image_tool_hint` is false. For exact-size image generation, check whether that tool exposes a size parameter; if not, generate at a close aspect ratio and resize locally. After host-native generation, use `scripts/import_generated_image.py` only when the tool reports a saved local image path. If the tool only displays an image without a local path, stop after reporting the generated image; do not poll or reason indefinitely waiting for an importable file.
+When a native host image tool can satisfy the task, use it before requesting local API-provider setup, even if `native_image_tool_hint` is false. Prove the capability with the first real image the workflow already needs: the character reference, a requested postcard, or the current day's scene. Do not create a throwaway test image when an actual required image can serve as the probe. For exact-size image generation, check whether that tool exposes a size parameter; if not, generate at a close aspect ratio and resize locally. After host-native generation, use `scripts/import_generated_image.py` only when the tool reports a saved local image path. If the tool only displays an image without a local path, stop after reporting the generated image; do not poll or reason indefinitely waiting for an importable file.
+
+When automation is available for a durable trip, create it by default. Ask only when the platform or operating system requires approval to install or enable the automation. Wallpaper changes still require explicit user approval.

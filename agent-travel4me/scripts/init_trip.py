@@ -65,6 +65,8 @@ def main() -> None:
         "days": route["days"],
         "direct_distance_km": route.get("direct_distance_km"),
         "route_distance_km": route.get("route_distance_km"),
+        "day_count_source": route.get("day_count_source"),
+        "requested_target_days": route.get("requested_target_days"),
         "style": args.style,
         "character": character,
         "label": {

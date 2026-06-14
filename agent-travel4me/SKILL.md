@@ -17,7 +17,7 @@ Supported adapter categories:
 
 - Native image tool adapter: call the host agent's image-generation tool directly from the current turn when it is available, then update local state if the tool returns a local image path.
 - API provider adapter: local scripts generate through configured API keys or command hooks.
-- Automation adapter: host agent reminder/automation first when available; OS schedulers only when local scripts can complete the run without the host agent.
+- Automation adapter: create the daily run automation by default after a durable trip is initialized. Use host agent reminder/automation first when available; use OS schedulers only when local scripts can complete the run without the host agent.
 - Weather adapter: host weather/search tool first when available; otherwise use a user-provided weather summary or a configured weather command.
 
 ## Overview
@@ -110,6 +110,8 @@ A complete run should create or update a trip directory under `~/.agent-travel4m
 
 If image generation is unavailable, the skill should still produce route data and prompts, then clearly state which local provider, API key, or native image tool is missing.
 
+If daily automation is available, the skill should create it without asking whether the user wants automation. Report what was created. Ask only when the host or operating system requires an approval step to install or enable the automation.
+
 ## Operating Rules
 
 1. Start with environment detection:
@@ -128,12 +130,16 @@ If image generation is unavailable, the skill should still produce route data an
 8. Allow at most 20% of days to skip human interaction, chosen as sparse/remote exceptions only when a human presence would feel forced. Record the exception reason on the waypoint.
 9. Treat weather as optional enhancement context. If the day's local weather is already available or user-provided, write it into `waypoint.weather`; missing weather should not block prompt generation, local image generation, or host-native image generation.
 10. Use local environment variables for API credentials; avoid asking users to paste keys into chat.
-11. Set wallpaper only after the user explicitly allows it.
-12. Keep user-facing travel narration separate from production logs. The traveler's voice excludes prompt, metadata, verification, composition, file paths, and image-generation mechanics.
+11. Create daily automation after trip initialization when an automation adapter is available. Do not ask the user whether to set automation; report the created schedule or the missing adapter. This is separate from wallpaper changes.
+12. Set wallpaper only after the user explicitly allows it.
+13. Keep future route stops as internal state. User-facing narration should reveal only the current day, already visited places, total day count, and broad journey direction. Show future waypoint names, landmarks, or the full route only if the user explicitly asks to see or export the full route.
+14. Keep user-facing travel narration separate from production logs. The traveler's voice excludes prompt, metadata, verification, composition, file paths, and image-generation mechanics.
 
 ## Image Generation Priority
 
 Use the current host's native image-generation tool first when it exists. Otherwise use the local provider reported by `scripts/detect_environment.py --json`.
+
+When a host advertises or exposes native image generation, prove it by attempting the first real required image generation: the character reference during durable-trip setup, or the first requested postcard/daily scene when no character reference is needed. Do not rely only on static capability text. If that actual image-generation call succeeds, continue on the host-native path. If the tool call itself fails or is unavailable, fall back to the local provider path.
 
 If no image path is available, still create route data and prompts, then state which local provider, API key, or host capability is missing. `native_image_tool_hint=false` is only a local detection hint; it is not a reason to skip an actually available host-native image tool.
 
@@ -195,7 +201,21 @@ python scripts/generate_character_reference.py --trip-dir <trip_dir>
 
 Ask user to confirm the resulting reference before generating daily scene images.
 
-### 4. Generate Daily Scene Image
+### 4. Create Daily Automation
+
+After the trip exists and before or immediately after the first daily scene, create the daily automation when an adapter is available. Prefer host agent automation/reminders when the host provides them. Use `scripts/install_schedule.py` for OS schedulers only when local scripts can run the daily image workflow without the host agent.
+
+Do not ask whether to create automation. Ask only if a tool, platform, or operating system approval dialog is required. If no automation adapter exists, report that daily generation will require manual runs until one is configured.
+
+For supported local OS schedulers:
+
+```bash
+python scripts/install_schedule.py \
+  --trip-dir <trip_dir> \
+  --install
+```
+
+### 5. Generate Daily Scene Image
 
 Before live image generation, validate route quality:
 
@@ -246,6 +266,8 @@ python scripts/import_generated_image.py \
 ```
 
 If the host tool only displays or attaches an image and does not expose a local file path, do not keep searching or waiting for one. Report that the image was generated/displayed and leave the trip with `day_###/prompt.txt` plus prompt-only metadata, or ask the user to provide the saved file path if local trip-state import is required.
+
+For a durable trip, generate only the current due day by default. Do not proactively offer to continue or generate all remaining days at once. If the user explicitly asks for a manual catch-up, preview, or bulk generation, follow the request while preserving route validation and state updates.
 
 To set wallpaper after generation, pass `--set-wallpaper` to the local API live run, or import the host-generated image and then call `scripts/set_wallpaper.py` manually.
 
