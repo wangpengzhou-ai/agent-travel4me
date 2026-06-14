@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import random
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,7 @@ LANDSCAPE_SEQUENCE = [
         "local_activity": "starting the journey with a small local departure ritual",
         "agent_activity": "pinning a tiny departure ticket to the backpack before departure",
         "human_interaction": "asking a local shopkeeper or station worker for a first route tip",
+        "crowd_interaction": "standing among local commuters and departure-day passersby while a station worker gives a small wave",
         "is_natural_or_semi_natural": False,
     },
     {
@@ -36,6 +36,7 @@ LANDSCAPE_SEQUENCE = [
             "pointing a tiny camera toward the morning crossing",
         ],
         "human_interaction": "listening to a boat operator or riverside vendor point out the next crossing",
+        "crowd_interaction": "waiting with a small riverside queue as boat operators and vendors prepare the crossing",
         "is_natural_or_semi_natural": True,
     },
     {
@@ -52,6 +53,7 @@ LANDSCAPE_SEQUENCE = [
             "holding a pressed leaf beside the winding path",
         ],
         "human_interaction": "greeting a local guide, shepherd, or trail caretaker on the path",
+        "crowd_interaction": "walking near a loose group of hikers, shepherds, or caretakers while trail markers lead uphill",
         "is_natural_or_semi_natural": True,
     },
     {
@@ -68,6 +70,7 @@ LANDSCAPE_SEQUENCE = [
             "sitting near a balcony shadow with a postcard pouch",
         ],
         "human_interaction": "buying a small local drink or snack from a stall owner",
+        "crowd_interaction": "sitting at the edge of a market crowd while stall owners pass snacks under the awning",
         "is_natural_or_semi_natural": False,
     },
     {
@@ -84,6 +87,7 @@ LANDSCAPE_SEQUENCE = [
             "crouching beside a trail marker while rock faces tower above",
         ],
         "human_interaction": "asking a trail caretaker or passing hiker about the safest path ahead",
+        "crowd_interaction": "moving with scattered hikers on a lookout path while a ranger keeps the trail edge clear",
         "is_natural_or_semi_natural": True,
     },
     {
@@ -100,6 +104,7 @@ LANDSCAPE_SEQUENCE = [
             "holding a small weathered token found by the road edge",
         ],
         "human_interaction": "thanking a local driver or roadside caretaker for directions",
+        "crowd_interaction": "pausing near a sparse roadside rest stop where drivers and caretakers gather briefly",
         "can_skip_human_interaction": True,
         "no_human_interaction_reason": "remote open-country crossing where adding a person would feel forced",
         "is_natural_or_semi_natural": True,
@@ -118,6 +123,7 @@ LANDSCAPE_SEQUENCE = [
             "holding a tiny warm cup beside the ferry rail",
         ],
         "human_interaction": "showing the route card to a ferry attendant or harbor worker",
+        "crowd_interaction": "waiting in a ferry queue among local passengers while a harbor worker signals boarding",
         "is_natural_or_semi_natural": True,
     },
     {
@@ -127,8 +133,21 @@ LANDSCAPE_SEQUENCE = [
         "local_activity": "marking arrival with a small local postcard or street-side ritual",
         "agent_activity": "holding a final travel postcard",
         "human_interaction": "receiving a final direction or welcome gesture from a local postcard seller",
+        "crowd_interaction": "sitting among plaza visitors or cafe regulars while a local seller clears space for the final postcard",
         "is_natural_or_semi_natural": False,
     },
+]
+
+
+VISUAL_WEATHER_SEQUENCE = [
+    "clear humid sunrise after light rain, with wet ground reflections and soft haze",
+    "cool river mist with damp stone, muted water reflections, and pale morning light",
+    "windy highland afternoon, with moving cloud shadows and a scarf tugged by gusts",
+    "warm market dusk after a dry day, with lantern glow, dust-soft walls, and shaded air",
+    "bright broken sun after passing showers, with wet leaves and sparkling path edges",
+    "cold moonlit night or blue-hour air, with protected lantern glow and long quiet shadows",
+    "hard salt-air daylight, with glare on water, gull wind, and crisp white highlights",
+    "soft overcast evening, with low clouds, saturated colors, and gentle reflected light",
 ]
 
 
@@ -184,19 +203,53 @@ def _agent_activity_for(template: dict[str, Any], day_index: int, total_days: in
     return str(options[cycle % len(options)])
 
 
-def _no_human_interaction_days(origin: str, destination: str, total_days: int) -> set[int]:
-    max_exceptions = int(total_days * 0.2)
-    if max_exceptions <= 0:
+def _solo_scene_days(total_days: int) -> set[int]:
+    if total_days < 4:
         return set()
-    candidates = [
-        index
-        for index in range(total_days)
-        if _landscape_for(index, total_days).get("can_skip_human_interaction")
-    ]
-    if not candidates:
+    return {index for index in range(1, total_days - 1) if index % 4 == 2}
+
+
+def _crowd_scene_days(total_days: int) -> set[int]:
+    if total_days < 3:
         return set()
-    rng = random.Random(f"{origin}|{destination}|{total_days}|human-interaction-exceptions")
-    return set(rng.sample(candidates, min(max_exceptions, len(candidates))))
+    return {index for index in range(total_days) if index in (0, total_days - 1) or index % 4 == 0}
+
+
+def _social_mode_for(day_index: int, total_days: int) -> str:
+    if day_index in _solo_scene_days(total_days):
+        return "solo"
+    if day_index in _crowd_scene_days(total_days):
+        return "crowd_context"
+    return "small_interaction"
+
+
+def _human_interaction_for(template: dict[str, Any], social_mode: str) -> str:
+    if social_mode == "solo":
+        return "none"
+    if social_mode == "crowd_context":
+        return str(template.get("crowd_interaction") or template["human_interaction"])
+    return template["human_interaction"]
+
+
+def _no_human_interaction_reason_for(template: dict[str, Any], social_mode: str) -> str | None:
+    if social_mode != "solo":
+        return None
+    return str(
+        template.get("no_human_interaction_reason")
+        or f"quiet {template['landscape_type']} pause where a solitary travel moment gives the route more visual variety"
+    )
+
+
+def _visual_weather_for(day_index: int) -> str:
+    return VISUAL_WEATHER_SEQUENCE[day_index % len(VISUAL_WEATHER_SEQUENCE)]
+
+
+def _agent_position_for(template: dict[str, Any], social_mode: str) -> str:
+    if social_mode == "solo":
+        return f"small off-center traveler in a quiet mid-ground edge of the {template['landscape_type']} scene"
+    if social_mode == "crowd_context":
+        return "small off-center traveler visible at the edge of a broader local crowd, never isolated as a mascot"
+    return "small off-center traveler naturally participating in the local environment"
 
 
 def _make_placeholder_landmarks(location: str, landscape_type: str) -> list[str]:
@@ -230,8 +283,14 @@ def plan_route(
             "include_human_interaction": True,
             "local_activity_must_be_place_specific": True,
             "human_interaction_must_be_place_specific": True,
-            "max_no_human_interaction_ratio": 0.2,
+            "vary_scene_social_mode": ["solo", "small_interaction", "crowd_context"],
+            "include_at_least_one_solo_scene_when_days_gte_4": True,
+            "include_at_least_one_crowd_scene_when_days_gte_4": True,
+            "avoid_one_on_one_human_interaction_every_day": True,
+            "max_no_human_interaction_ratio": 0.35,
             "no_human_interaction_requires_reason": True,
+            "include_visual_weather_or_atmosphere": True,
+            "visual_weather_is_not_live_weather": True,
             "write_activity_and_interaction_during_route_planning": True,
         },
     }
@@ -245,7 +304,6 @@ def plan_route(
     has_real_coords = origin_coords is not None and destination_coords is not None
 
     waypoints = []
-    no_human_days = _no_human_interaction_days(origin, destination, days)
     for idx in range(days):
         t = idx / max(1, days - 1)
         template = _landscape_for(idx, days)
@@ -257,7 +315,7 @@ def plan_route(
             location = f"Route waypoint {idx + 1}"
         coords = _interpolate(start, end, t) if has_real_coords else {"lat": None, "lon": None}
         landscape_type = template["landscape_type"]
-        skip_human_interaction = idx in no_human_days
+        social_mode = _social_mode_for(idx, days)
         waypoints.append(
             {
                 "day": idx + 1,
@@ -271,9 +329,11 @@ def plan_route(
                 "palette": ["locally appropriate colors", "route-specific light", "style-consistent accents"],
                 "local_activity": template["local_activity"],
                 "agent_activity": _agent_activity_for(template, idx, days),
-                "human_interaction": "none" if skip_human_interaction else template["human_interaction"],
-                "no_human_interaction_reason": template.get("no_human_interaction_reason") if skip_human_interaction else None,
-                "agent_position": "small off-center traveler naturally participating in the local environment",
+                "scene_social_mode": social_mode,
+                "human_interaction": _human_interaction_for(template, social_mode),
+                "no_human_interaction_reason": _no_human_interaction_reason_for(template, social_mode),
+                "visual_weather": _visual_weather_for(idx),
+                "agent_position": _agent_position_for(template, social_mode),
                 "prompt_focus": f"{landscape_type} with recognizable local identity",
                 "is_natural_or_semi_natural": template["is_natural_or_semi_natural"],
                 "needs_enrichment": True,
@@ -301,12 +361,12 @@ def plan_route(
         "day_count_source": day_count_source,
         "requested_target_days": target_days,
         "human_interaction_policy": {
-            "default": "include a local person interaction on each day",
-            "max_no_human_interaction_ratio": 0.2,
-            "exception_rule": "only skip human interaction when a remote or sparse place would make people feel forced",
+            "default": "vary social density across solo moments, small local interactions, and broader crowd scenes",
+            "max_no_human_interaction_ratio": 0.35,
+            "exception_rule": "solo scenes are allowed when they make the route visually less repetitive and include a reason",
         },
         "needs_enrichment": True,
-        "enrichment_note": "No external route/geocoding command was configured. A coding agent should enrich route waypoints with real city/region names, landmarks, local visual elements, coordinates, and place-specific local activities and human interactions before live generation.",
+        "enrichment_note": "No external route/geocoding command was configured. A coding agent should enrich route waypoints with real city/region names, landmarks, local visual elements, coordinates, varied scene_social_mode values, visual weather or atmosphere, and place-specific local activities and human interactions before live generation.",
         "waypoints": waypoints,
     }
 

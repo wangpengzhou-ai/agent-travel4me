@@ -17,7 +17,7 @@ Set `day_count_source` on the route:
 After estimating, confirm with the user:
 
 ```text
-我算了一下，从 {origin} 到 {destination}，我大概需要 {days} 天能抵达。你想让我更快一点吗？如果想，告诉我你希望几天内到，我会换更快的交通工具。
+我算了一下，从 {origin} 到 {destination}，我大概需要 {days} 天能抵达。你想让我把旅程压缩一点吗？如果想，告诉我你希望几天内抵达，我会减少中间停留、让叙事节奏更紧凑。
 ```
 
 ## Waypoint Fields
@@ -36,8 +36,10 @@ Every waypoint must include:
 - `palette`
 - `local_activity` with a concrete place, region, landmark, festival, food, craft, route ritual, or transport detail
 - `agent_activity`
-- `human_interaction` with a concrete local role and the place, region, or landmark it belongs to
+- `scene_social_mode`: `solo`, `small_interaction`, or `crowd_context`
+- `human_interaction` with a concrete local role and the place, region, or landmark it belongs to, or `none` for solo scenes
 - `no_human_interaction_reason` when human interaction is skipped
+- `visual_weather` when live/user-provided weather is unavailable and the scene needs a non-real-time atmospheric cue
 - `agent_position`
 - `prompt_focus`
 - `is_natural_or_semi_natural`
@@ -55,9 +57,9 @@ Before live image generation, run:
 python scripts/validate_route.py --trip-dir <trip_dir>
 ```
 
-Block live image generation when validation reports unresolved placeholders, generic local activity, generic human interaction, missing coordinates, missing landmarks, missing local activity, missing human interaction without a valid exception reason, more than 20% no-human-interaction days, too few natural/semi-natural days, or three consecutive city-only days. Dry-run prompt generation is still allowed for route debugging.
+Block live image generation when validation reports unresolved placeholders, generic local activity, generic human interaction, missing coordinates, missing landmarks, missing local activity, missing human interaction without a valid exception reason, more than 35% no-human-interaction days, too few natural/semi-natural days, or three consecutive city-only days. Dry-run prompt generation is still allowed for route debugging.
 
-Validation may also report quality warnings, such as repeated exact `agent_activity` text, too many map/route-card Agent activities, or local activities that do not explicitly mention the waypoint place, region, or landmark. These warnings do not block live generation by default. Pass `--strict-quality` when those warnings should fail validation.
+Validation may also report quality warnings, such as repeated exact `agent_activity` text, too many map/route-card Agent activities, overly narrow social variety, missing solo/crowd scene variety, or local activities that do not explicitly mention the waypoint place, region, or landmark. These warnings do not block live generation by default. Pass `--strict-quality` when those warnings should fail validation.
 
 Before generating any final daily image prompt or asking a host-native image tool to generate, you may run the daily context gate for required label context:
 
@@ -65,7 +67,7 @@ Before generating any final daily image prompt or asking a host-native image too
 python scripts/validate_route.py --trip-dir <trip_dir> --require-day-context <day>
 ```
 
-Weather is optional nice-to-have context. If it is unavailable, continue without a weather line.
+Weather is optional nice-to-have context. If it is unavailable, continue without a live-weather line. Use `visual_weather` only as a narrative atmospheric cue; do not present it as current/local weather data.
 
 When a host agent enriches the route, write the enriched route as JSON and apply it with:
 
@@ -92,13 +94,14 @@ Rules:
 1. Preserve origin and destination.
 2. Prefer recognizable landmarks and distinctive landscapes.
 3. Plan one locally distinctive activity for each waypoint before prompt generation. Write it directly into `local_activity`; do not leave it for prompt generation to invent later.
-4. Include an interaction with local people on at least 80% of days. Write it directly into `human_interaction` with a concrete local role and the specific place, region, or landmark context.
-5. If a sparse or remote day has no believable local human activity, mark `human_interaction` as `none` and write `no_human_interaction_reason`; these exceptions must stay at or below 20% of the route.
-6. Avoid three consecutive city-only days.
-7. For 15-24 day routes, include at least 7 natural or semi-natural days.
-8. For 25-30 day routes, include at least 10 natural or semi-natural days.
-9. Store coordinates for later website visualization.
-10. If the user wants faster arrival, remove similar intermediate nodes and keep major geographic transitions.
+4. Vary social density across `solo`, `small_interaction`, and `crowd_context` scenes. For routes of 4+ days, include at least one quiet solo Agent moment and at least one market, queue, festival, transit, or public-life crowd scene.
+5. Balance direct small interactions with broader public-life scenes. Keep small interactions to about 60% of days or less, and write crowd or public-life context directly into `human_interaction` when `scene_social_mode` is `crowd_context`.
+6. If a day has no direct human interaction, mark `human_interaction` as `none` and write `no_human_interaction_reason`; these solo scenes should stay at or below 35% of the route.
+7. Avoid three consecutive city-only days.
+8. For 15-24 day routes, include at least 7 natural or semi-natural days.
+9. For 25-30 day routes, include at least 10 natural or semi-natural days.
+10. Store coordinates for later website visualization.
+11. If the user wants a shorter journey, remove similar intermediate nodes and keep the major geographic transitions.
 
 ## User-Facing Reveal Rule
 

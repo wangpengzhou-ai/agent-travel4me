@@ -16,15 +16,16 @@ Include these fields in order:
 3. `landmarks`
 4. `landscape_type`
 5. `local_visual_elements`
-6. `weather_context`, when available
+6. `weather_context`, when available, or `visual_weather` as non-live atmospheric mood
 7. `agent_identity`
 8. `local_activity`
 9. `agent_activity`
-10. `human_interaction`
-11. `agent_composition_rule`
-12. `upper_left_travel_label`
-13. `wallpaper_layout`
-14. `negative_constraints`
+10. `scene_social_mode`
+11. `human_interaction`
+12. `agent_composition_rule`
+13. `upper_left_travel_label`
+14. `wallpaper_layout`
+15. `negative_constraints`
 
 ## Upper-left Travel Label
 
@@ -50,6 +51,7 @@ Weather is optional prompt context:
 - Route planning may omit weather.
 - Final postcards, wallpapers, host-native image generation, and importable daily scene images may omit weather.
 - Do not silently substitute generic seasonal climate for current/local weather. If weather is unavailable, simply omit the weather line.
+- When live/user-provided weather is unavailable, route planning may set `visual_weather` as a narrative atmosphere cue, such as mist, wind, drizzle, blue hour, or post-rain reflections. Label it as scene mood, not live weather data.
 
 ## Character Identity Lock
 
@@ -68,9 +70,13 @@ Vary the Agent's placement instead of defaulting to the lower-left or lower-righ
 
 Each waypoint should plan a locally distinctive activity before prompt generation. Prefer activities that reveal local life, work, food, transport, craft, hospitality, worship, market routines, festivals, or route-specific travel rituals. The activity must already be written into route state and should name the place, region, landmark, festival, food, craft, transport line, or market context instead of saying only "local activity."
 
-Human interaction is the default. At least 80% of days must show the Agent interacting with local people through the day's activity. Use specific local roles, such as a vendor, guide, ferry worker, resident, craftsperson, host, caretaker, or fellow traveler, and tie the interaction to the day's actual place, region, or landmark.
+Vary the scene's social density. Use `scene_social_mode` to choose among:
 
-Up to 20% of days may skip human interaction if the place is genuinely sparse or remote and adding people would feel forced. Those waypoints must set `human_interaction` to `none` and include `no_human_interaction_reason`.
+- `solo`: the Agent is alone or only has distant/background people; use this for quiet rest, observation, play, weather-watching, sketching, or route pauses.
+- `small_interaction`: the Agent has a specific, secondary interaction with a local role such as a vendor, guide, ferry worker, resident, craftsperson, host, caretaker, or fellow traveler.
+- `crowd_context`: the Agent is part of broader public life, such as a market, queue, ferry, festival, commuters, visitors, or a group activity.
+
+For routes of 4+ days, include at least one solo scene and at least one crowd-context scene. Keep direct small interactions to about 60% of days or less. Solo scenes should set `human_interaction` to `none` and include `no_human_interaction_reason`.
 
 Examples of interaction sources:
 
@@ -101,10 +107,10 @@ Examples of interaction sources:
 Rules:
 
 - Use at most one small activity per image.
-- Keep activities varied across eating, transport, resting, observing, and route-checking scenes.
+- Keep activities varied across eating, transport, resting, observing, playing, sheltering from weather, sketching, and route-checking scenes.
 - Do not repeat the exact same `agent_activity` text across multiple days.
 - Use maps or route cards sparingly, at most about 25% of days. Do not make map-checking the repeated visible action unless the user explicitly made the map the Agent's signature item.
-- Allow quiet scenery-watching only as part of the 20% no-human-interaction exception, or as a background mood while the Agent still has a small human interaction.
+- Quiet scenery-watching, resting, or playing can be a deliberate solo scene; keep it visually specific to the waypoint instead of generic staring.
 - The Agent occupies less than 6% of image area.
 - The Agent is off-center.
 - The destination landscape and landmarks are the main subject.
@@ -123,10 +129,12 @@ Scene: Day {day}/{total}, {location}, {country_or_region}.
 Main visual subject: {landscape_type} with {landmarks}.
 Local visual elements: {local_visual_elements}.
 Weather, when available: {weather_context}. Let the weather shape the sky, light, water or ground texture, clothing details, and mood.
+Visual atmosphere, when live weather is unavailable: {visual_weather}. Treat this as scene mood, not live weather data.
 Journey continuity: the same tiny agent traveler is passing through this place on the way from {origin} to {destination}.
 Agent: {character_identity}. The agent is small, off-center, naturally participating in the local environment, occupying less than 6% of the image.
 Local activity: {local_activity}.
 Agent activity: {context-aware interaction}.
+Social scene: {solo | small local interaction | broader crowd or group context}.
 Human interaction: {human_interaction}.
 Upper-left travel label: draw exactly one small hand-lettered postcard label in the upper-left safe area. Exact text: "{label_text}". Use the sample style: title-case place name and full written date, no all-caps text, no slash separator, no day number. Keep the same label position, margin, scale, ink color, and lettering style across every day. Make it feel painted or printed into the artwork.
 Composition: wide landscape wallpaper, destination and environment are the main subject, clear negative space for desktop icons.

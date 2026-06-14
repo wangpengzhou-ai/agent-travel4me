@@ -46,6 +46,13 @@ MAP_ACTIVITY_PATTERNS = [
     re.compile(r"\b(map|route card|route page|route map|folded map)\b", re.IGNORECASE),
     re.compile(r"\b(checking|reading|marking|studying)\b.*\b(route|map)\b", re.IGNORECASE),
 ]
+VALID_SCENE_SOCIAL_MODES = {"solo", "small_interaction", "crowd_context"}
+CROWD_CONTEXT_PATTERNS = [
+    re.compile(
+        r"\b(crowd|queue|line|commuters|passengers|visitors|pilgrims|festival|market-goers|group)\b",
+        re.IGNORECASE,
+    ),
+]
 
 
 def _has_placeholder(value: Any) -> bool:
@@ -140,6 +147,21 @@ def _normalized_activity(value: Any) -> str | None:
     return re.sub(r"\s+", " ", value.strip().lower())
 
 
+def _scene_social_mode(waypoint: dict[str, Any]) -> str:
+    explicit = str(waypoint.get("scene_social_mode") or "").strip().lower()
+    if explicit in VALID_SCENE_SOCIAL_MODES:
+        return explicit
+    if not _has_human_interaction(waypoint):
+        return "solo"
+    text = " ".join(
+        str(waypoint.get(field) or "")
+        for field in ("local_activity", "agent_activity", "human_interaction", "agent_position")
+    )
+    if any(pattern.search(text) for pattern in CROWD_CONTEXT_PATTERNS):
+        return "crowd_context"
+    return "small_interaction"
+
+
 def _specificity_terms(waypoint: dict[str, Any]) -> list[str]:
     raw_terms: list[str] = []
     for field in ("location", "country_or_region"):
@@ -195,6 +217,9 @@ def validate_route_report(route_or_trip: dict[str, Any]) -> dict[str, list[str]]
     natural_days = 0
     no_human_interaction_days = 0
     map_activity_days = 0
+    solo_scene_days = 0
+    crowd_context_days = 0
+    small_interaction_days = 0
     agent_activity_counts: dict[str, int] = {}
     city_streak = 0
     for index, waypoint in enumerate(waypoints, start=1):
@@ -223,6 +248,17 @@ def validate_route_report(route_or_trip: dict[str, Any]) -> dict[str, list[str]]
         normalized_agent_activity = _normalized_activity(waypoint.get("agent_activity"))
         if normalized_agent_activity:
             agent_activity_counts[normalized_agent_activity] = agent_activity_counts.get(normalized_agent_activity, 0) + 1
+
+        explicit_social_mode = waypoint.get("scene_social_mode")
+        if explicit_social_mode and str(explicit_social_mode).strip().lower() not in VALID_SCENE_SOCIAL_MODES:
+            warnings.append(f"day {index}: scene_social_mode should be solo, small_interaction, or crowd_context")
+        social_mode = _scene_social_mode(waypoint)
+        if social_mode == "solo":
+            solo_scene_days += 1
+        elif social_mode == "crowd_context":
+            crowd_context_days += 1
+        else:
+            small_interaction_days += 1
 
         if not _has_text(waypoint.get("local_activity")):
             errors.append(f"day {index}: local_activity is missing")
@@ -275,7 +311,17 @@ def validate_route_report(route_or_trip: dict[str, Any]) -> dict[str, list[str]]
             preview += "; ..."
         warnings.append(f"route repeats exact agent_activity text: {preview}")
 
-    max_no_human_interaction_days = int(days * 0.2)
+    if days >= 4 and solo_scene_days == 0:
+        warnings.append("route has no quiet solo Agent scene; add at least one non-forced solo travel moment")
+    if days >= 4 and crowd_context_days == 0:
+        warnings.append("route has no crowd or group-context scene; add at least one market, queue, festival, transit, or public-life moment")
+    max_small_interaction_days = max(2, int(days * 0.6))
+    if small_interaction_days > max_small_interaction_days:
+        warnings.append(
+            f"route uses small-interaction social mode on {small_interaction_days} days; consider at most {max_small_interaction_days}"
+        )
+
+    max_no_human_interaction_days = int(days * 0.35)
     if no_human_interaction_days > max_no_human_interaction_days:
         errors.append(
             f"route allows at most {max_no_human_interaction_days} no-human-interaction days; found {no_human_interaction_days}"

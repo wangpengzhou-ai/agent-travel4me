@@ -24,7 +24,7 @@ Supported adapter categories:
 
 `agent-travel4me` turns a user's travel wish into a local, multi-day Agent journey. The agent acts as a small recurring traveler moving from an origin to a destination. For each day, the workflow chooses a waypoint, builds a scene prompt with recognizable local details, can optionally generate an image, and advances the trip state.
 
-The skill is for "Agent travels for me" narrative production. Travel booking and real itinerary advice are outside scope. The route should be visually coherent and geographically plausible. The main deliverable is durable journey state, route data, daily scene prompts, and optional visual artifacts. Desktop wallpaper is one supported presentation option.
+The route is a visually coherent, geographically plausible narrative arc for daily postcard-style scenes. The main deliverable is durable journey state, route data, daily scene prompts, and optional visual artifacts. Desktop wallpaper is one supported presentation option.
 
 ## Direct Postcard Image Requests
 
@@ -36,7 +36,7 @@ For this fast path:
 
 1. Do not run environment detection, initialize a trip, validate a route, create a character reference, or ask for character confirmation first.
 2. Resolve small ambiguities quickly. If the user gives a count that conflicts with the listed locations, prefer the explicit location list and mention the mismatch.
-3. Build one compact prompt per requested image using the fixed watercolor postcard contract: 16:9, one small off-center recurring traveler, environment-first composition, local activity or human interaction, and exactly one upper-left `Place    Month D, YYYY` label.
+3. Build one compact prompt per requested image using the fixed watercolor postcard contract: 16:9, one small off-center recurring traveler, environment-first composition, varied solo/small-interaction/crowd-context activity, and exactly one upper-left `Place    Month D, YYYY` label.
 4. If the user supplies a character image, keep that character as the identity lock and only add small recurring accessories when allowed.
 5. Call the host image-generation tool directly after the first prompt is ready. In Codex, use `image_gen` / `imagegen`; do not first reason through the full trip-state workflow, inspect files, or run shell commands.
 6. For multiple locations, generate images sequentially, one tool call per location, so the user sees progress quickly.
@@ -45,7 +45,7 @@ For this fast path:
 Compact prompt pattern for each direct postcard:
 
 ```text
-Create one 16:9 watercolor travel postcard for {place}. Use {character_source} as the same recurring tiny Agent traveler: {character_identity}. Preserve the identity and stable visual anchors; add only {allowed_accessories}. The Agent must be small, off-center, naturally participating in a local activity or gentle human interaction. The environment is the main subject, with recognizable local landmarks, landscape, textures, colors, and daily life. Add exactly one small hand-lettered upper-left label: "{place_label}    {date_label}". No other readable text, logos, watermarks, centered Agent, close-up mascot portrait, generic tourist collage, or wrong landmarks.
+Create one 16:9 watercolor travel postcard for {place}. Use {character_source} as the same recurring tiny Agent traveler: {character_identity}. Preserve the identity and stable visual anchors; add only {allowed_accessories}. The Agent must be small, off-center, naturally participating in a local activity; vary scenes across solo moments, gentle local interactions, and broader crowd/public-life context. The environment is the main subject, with recognizable local landmarks, landscape, textures, colors, weather or atmospheric mood, and daily life. Add exactly one small hand-lettered upper-left label: "{place_label}    {date_label}". No other readable text, logos, watermarks, centered Agent, close-up mascot portrait, generic tourist collage, or wrong landmarks.
 ```
 
 ## First-Run Start
@@ -124,11 +124,11 @@ If daily automation is available, the skill should create it without asking whet
    - Generate three concrete, visually reproducible candidates using the Agent Candidate Guidance.
 4. Generate or prompt for a character reference before daily scene images. Ask the user to confirm it.
 5. Estimate journey length automatically, capped at 30 days. Confirm the estimate:
-   - "我算了一下，从 {origin} 到 {destination}，我大概需要 {days} 天能抵达。你想让我更快一点吗？如果想，告诉我你希望几天内到，我会换更快的交通工具。"
-6. Keep the Agent as a small recurring traveler while the environment remains the main subject. Route planning must write a locally distinctive activity into each waypoint, and the Agent should usually interact with local people through that activity.
+   - "我算了一下，从 {origin} 到 {destination}，我大概需要 {days} 天能抵达。你想让我把旅程压缩一点吗？如果想，告诉我你希望几天内抵达，我会减少中间停留、让叙事节奏更紧凑。"
+6. Keep the Agent as a small recurring traveler while the environment remains the main subject. Route planning must write a locally distinctive activity into each waypoint and vary `scene_social_mode` across solo, small interaction, and crowd context.
 7. Keep the Agent off-center and vary placement across the frame, with no repeated lower-left/lower-right standing poses.
-8. Allow at most 20% of days to skip human interaction, chosen as sparse/remote exceptions only when a human presence would feel forced. Record the exception reason on the waypoint.
-9. Treat weather as optional enhancement context. If the day's local weather is already available or user-provided, write it into `waypoint.weather`; missing weather should not block prompt generation, local image generation, or host-native image generation.
+8. Allow quiet solo scenes when they improve visual variety, not only for remote exceptions. Keep no-human-interaction days to about 35% or less and record the reason on the waypoint.
+9. Treat live weather as optional enhancement context. If the day's local weather is already available or user-provided, write it into `waypoint.weather`; missing weather should not block prompt generation, local image generation, or host-native image generation. If live weather is unavailable, use `visual_weather` only as scene mood, not current weather data.
 10. Use local environment variables for API credentials; avoid asking users to paste keys into chat.
 11. Create daily automation after trip initialization when an automation adapter is available. Do not ask the user whether to set automation; report the created schedule or the missing adapter. This is separate from wallpaper changes.
 12. Set wallpaper only after the user explicitly allows it.
@@ -182,8 +182,10 @@ Each live day should also have:
 - `label_location`: short place name for the upper-left label when the full route location is too long.
 - `label_date`: exact date text or ISO date when overriding the default trip start date. The rendered label should use the full written date style, such as `May 28, 2026`.
 - `weather`: optional day's local weather summary. Use the current agent's weather/search capability when available, or accept a user-provided weather summary.
+- `scene_social_mode`: `solo`, `small_interaction`, or `crowd_context`.
+- `visual_weather`: optional non-live atmospheric cue when actual local weather is unavailable.
 
-Weather is nice-to-have prompt context. If it is missing, generate the daily prompt without a `Weather:` line and continue the workflow.
+Weather is nice-to-have prompt context. If it is missing, generate the daily prompt without a `Weather:` line and continue the workflow. `visual_weather` may still be used as a scene mood, but must not be presented as current weather.
 
 ### 3. Generate Character Reference
 
@@ -223,7 +225,7 @@ Before live image generation, validate route quality:
 python scripts/validate_route.py --trip-dir <trip_dir>
 ```
 
-Default validation blocks only route structure and generation-readiness errors. It may also print quality warnings, such as repeated Agent actions or too many map/route-card activities; treat those as route improvement suggestions unless the user wants strict review. Use `--strict-quality` when quality warnings should fail validation too.
+Default validation blocks only route structure and generation-readiness errors. It may also print quality warnings, such as repeated Agent actions, too many map/route-card activities, overly narrow social variety, or missing solo/crowd variety; treat those as route improvement suggestions unless the user wants strict review. Use `--strict-quality` when quality warnings should fail validation too.
 
 If validation fails because the route still contains placeholders, missing required route data, or other blocking errors, enrich the route with real places, coordinates, landmarks, local visual elements, and natural/semi-natural days, save it as JSON, then apply it:
 
@@ -277,7 +279,7 @@ Only use `--set-wallpaper` after user approval.
 
 Before route enrichment or live daily image generation, use `references/route_planning.md` for waypoint requirements and `references/prompt_contract.md` for prompt requirements.
 
-Non-negotiables: use real places, coordinates, landmarks, locally specific activities, and concrete local human interactions unless a sparse or remote day has an explicit exception reason. Keep weather optional. Keep the Agent small and off-center. Draw exactly one upper-left place/date label.
+Non-negotiables: use real places, coordinates, landmarks, locally specific activities, varied Agent actions, and varied social density across solo, small-interaction, and crowd-context scenes. Keep live weather optional; use `visual_weather` only as atmospheric mood when needed. Keep the Agent small and off-center. Draw exactly one upper-left place/date label.
 
 The script gate is `python scripts/validate_route.py --trip-dir <trip_dir>`. Use `--strict-quality` only when route quality warnings should also block generation.
 

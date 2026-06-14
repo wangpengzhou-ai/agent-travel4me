@@ -80,11 +80,13 @@ def build_prompt_context(trip: dict[str, Any], waypoint: dict[str, Any]) -> dict
     display_date = _display_date(trip, waypoint)
     label_location = _display_location(waypoint)
     label_text = f"{label_location}    {display_date}" if display_date else label_location
+    visual_weather = str(waypoint.get("visual_weather") or "").strip()
     return {
         "label_location": label_location,
         "label_date": display_date,
         "label_text": label_text,
         "weather_text": _weather_text(waypoint),
+        "visual_weather_text": visual_weather or None,
     }
 
 
@@ -118,14 +120,32 @@ def build_wallpaper_prompt(trip: dict[str, Any], waypoint: dict[str, Any]) -> st
         weather_line.append(
             f"Weather: {context['weather_text']}. Let the weather shape the sky, light, water or ground texture, clothing details, and mood."
         )
+    elif context["visual_weather_text"]:
+        weather_line.append(
+            f"Visual atmosphere: {context['visual_weather_text']}. Treat this as scene mood, not live weather data; use it for sky, light, water or ground texture, clothing details, and mood."
+        )
 
     human_interaction = str(waypoint.get("human_interaction") or "").strip()
+    scene_social_mode = str(waypoint.get("scene_social_mode") or "small_interaction").strip().lower()
+    social_scene_lines = []
+    if scene_social_mode == "solo":
+        social_scene_lines.append(
+            "Social scene: quiet solo travel moment with the Agent alone in the local environment."
+        )
+    elif scene_social_mode == "crowd_context":
+        social_scene_lines.append(
+            "Social scene: broader crowd or group context with multiple local people as ambient daily life."
+        )
+    else:
+        social_scene_lines.append(
+            "Social scene: small local interaction; keep any local person secondary to the landscape and daily activity."
+        )
     human_interaction_lines = []
     if human_interaction.lower().rstrip(".") not in NO_HUMAN_INTERACTION_VALUES and human_interaction:
         human_interaction_lines.append(f"Human interaction: {human_interaction}.")
     elif waypoint.get("no_human_interaction_reason"):
         human_interaction_lines.append(
-            f"Human interaction: none in this scene because {waypoint['no_human_interaction_reason']}. Do not add forced people."
+            f"Human interaction: none in this scene because {waypoint['no_human_interaction_reason']}."
         )
 
     return "\n".join(
@@ -140,6 +160,7 @@ def build_wallpaper_prompt(trip: dict[str, Any], waypoint: dict[str, Any]) -> st
             f"Agent: {character_identity}. The agent is small, off-center, naturally participating in the local environment, occupying less than 6% of the image.",
             f"Local activity: {waypoint.get('local_activity', waypoint.get('agent_activity', 'quietly observing local life'))}.",
             f"Agent activity: {waypoint.get('agent_activity', 'quietly watching the scenery')}.",
+            *social_scene_lines,
             *human_interaction_lines,
             f"Agent placement: {waypoint.get('agent_position', 'small off-center traveler integrated with the scene')}.",
             f"Upper-left travel label: draw exactly one small hand-lettered postcard label in the upper-left safe area. Exact text: \"{context['label_text']}\". Match the bundled sample at assets/style_samples/watercolor-postcard-rome.png: title-case place name, full written date, no slash, no all-caps text, no day number. Keep the same label position, margin, scale, ink color, and lettering style across every day. Make it feel painted or printed into the artwork, not like a digital overlay.",
