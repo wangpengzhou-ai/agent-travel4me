@@ -15,12 +15,20 @@ class ImageProviderError(RuntimeError):
     pass
 
 
+def _env_value(*names: str) -> str | None:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
 def selected_provider() -> str | None:
     if os.environ.get("OPENAI_API_KEY"):
         return "openai"
     if os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
         return "gemini"
-    if os.environ.get("SEEDREAM_API_KEY") or os.environ.get("TRAVEL4ME_IMAGE_COMMAND"):
+    if os.environ.get("SEEDREAM_API_KEY") or _env_value("TRAVEL_AGENTS_IMAGE_COMMAND", "TRAVEL4ME_IMAGE_COMMAND"):
         return "seedream"
     return None
 
@@ -38,15 +46,28 @@ def generate_image(
     if reference_image and reference_image not in references:
         references.append(reference_image)
     if provider == "openai":
-        return generate_openai(prompt, out_path, size)
+        meta = generate_openai(prompt, out_path, size)
+        return _with_reference_meta(meta, references, used=False)
     if provider == "gemini":
-        return generate_gemini(prompt, out_path, size)
+        meta = generate_gemini(prompt, out_path, size)
+        return _with_reference_meta(meta, references, used=False)
     if provider == "seedream":
-        return generate_seedream(prompt, out_path, size, references)
+        meta = generate_seedream(prompt, out_path, size, references)
+        return _with_reference_meta(meta, references, used=True)
     raise ImageProviderError(
         "No image provider is configured. Set OPENAI_API_KEY, GOOGLE_API_KEY/GEMINI_API_KEY, "
-        "SEEDREAM_API_KEY, or TRAVEL4ME_IMAGE_COMMAND; or use the surrounding agent's native image tool."
+        "SEEDREAM_API_KEY, or TRAVEL_AGENTS_IMAGE_COMMAND; or use the surrounding agent's native image tool."
     )
+
+
+def _with_reference_meta(meta: dict[str, Any], references: list[Path], used: bool) -> dict[str, Any]:
+    meta["reference_image_paths_requested"] = [str(path) for path in references]
+    meta["reference_images_used"] = bool(references and used)
+    if references and not used:
+        meta["reference_image_warning"] = (
+            f"{meta.get('provider', 'provider')} integration is prompt-only and did not attach reference images"
+        )
+    return meta
 
 
 def _write_b64_png(out_path: Path, data: str) -> None:
@@ -121,10 +142,10 @@ def generate_gemini(prompt: str, out_path: Path, size: str) -> dict[str, Any]:
 
 
 def generate_seedream(prompt: str, out_path: Path, size: str, reference_images: list[Path] | None = None) -> dict[str, Any]:
-    command = os.environ.get("TRAVEL4ME_IMAGE_COMMAND")
+    command = _env_value("TRAVEL_AGENTS_IMAGE_COMMAND", "TRAVEL4ME_IMAGE_COMMAND")
     if not command:
         raise ImageProviderError(
-            "Seedream direct API wiring is deployment-specific. Set TRAVEL4ME_IMAGE_COMMAND to a command "
+            "Seedream direct API wiring is deployment-specific. Set TRAVEL_AGENTS_IMAGE_COMMAND to a command "
             "that reads JSON from stdin and writes the image to the provided output path."
         )
     references = reference_images or []
@@ -139,7 +160,7 @@ def generate_seedream(prompt: str, out_path: Path, size: str, reference_images: 
     }
     result = subprocess.run(command, input=json.dumps(payload), text=True, shell=True, capture_output=True, timeout=300, check=False)
     if result.returncode != 0:
-        raise ImageProviderError(f"TRAVEL4ME_IMAGE_COMMAND failed: {result.stderr or result.stdout}")
+        raise ImageProviderError(f"TRAVEL_AGENTS_IMAGE_COMMAND failed: {result.stderr or result.stdout}")
     if not out_path.exists():
-        raise ImageProviderError(f"TRAVEL4ME_IMAGE_COMMAND did not create {out_path}")
+        raise ImageProviderError(f"TRAVEL_AGENTS_IMAGE_COMMAND did not create {out_path}")
     return {"provider": "seedream", "model": payload["model"], "command_stdout": result.stdout.strip()}

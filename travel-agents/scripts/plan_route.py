@@ -152,12 +152,12 @@ VISUAL_WEATHER_SEQUENCE = [
 
 
 def _run_external_route_planner(payload: dict[str, Any]) -> dict[str, Any] | None:
-    command = os.environ.get("TRAVEL4ME_ROUTE_COMMAND")
+    command = os.environ.get("TRAVEL_AGENTS_ROUTE_COMMAND") or os.environ.get("TRAVEL4ME_ROUTE_COMMAND")
     if not command:
         return None
     result = subprocess.run(command, input=json.dumps(payload), text=True, shell=True, capture_output=True, timeout=120, check=False)
     if result.returncode != 0:
-        raise RuntimeError(f"TRAVEL4ME_ROUTE_COMMAND failed: {result.stderr or result.stdout}")
+        raise RuntimeError(f"TRAVEL_AGENTS_ROUTE_COMMAND failed: {result.stderr or result.stdout}")
     return json.loads(result.stdout)
 
 

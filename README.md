@@ -1,6 +1,6 @@
-# agent-travel4me
+# travel agents
 
-`agent-travel4me` 是一个让你的 Agent 独自远行、为你捕捉远方风景的日常互动项目。
+`travel agents` 是一个让你的 Agent 独自远行、为你捕捉远方风景的日常互动项目。
 
 只要给出一个目的地，你的 Agent 就会自发开启一段多日旅程。它会沿着真实的地理路线，顶着当地的天气，在世界各地漫游。**每天它都会给你寄回一封水彩手绘风的明信片**，盖着当地的邮戳，带你无感同步它在世界各地的日常与奇遇。
 
@@ -21,7 +21,7 @@
 ## 📂 目录结构
 
 ```text
-agent-travel4me/
+travel-agents/
 ├── SKILL.md                          # 说明与操作规则
 ├── agents/openai.yaml                # 启动配置
 ├── scripts/                          # 驱动旅行的核心本地脚本（初始化、每日推进等）
@@ -46,7 +46,7 @@ agent-travel4me/
 设定起点、终点，以及随身标志（比如戴一条红围巾，方便它在明信片里认出自己）：
 
 ```bash
-cd agent-travel4me
+cd travel-agents
 python scripts/init_trip.py \
   --origin "Shenzhen" \
   --destination "Rome" \
@@ -68,7 +68,7 @@ python scripts/daily_run.py --trip-dir <trip_dir>
 
 ## English Introduction
 
-`agent-travel4me` is a lightweight, immersive daily interaction project that allows your Agent to travel the world on your behalf.
+`travel agents` is a lightweight, immersive daily interaction project that allows your Agent to travel the world on your behalf.
 
 Simply provide a destination, and your Agent will spontaneously set off on a multi-day journey. Following geographically authentic routes and local weather patterns, **your Agent will mail you a beautiful watercolor postcard every single day**. Complete with a local date stamp and landmark illustrations, it captures your Agent's daily encounters and cultural discoveries from across the globe.
 

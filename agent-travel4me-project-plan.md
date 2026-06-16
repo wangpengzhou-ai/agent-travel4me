@@ -1,8 +1,8 @@
-# agent-travel4me 通用 Skill 项目方案
+# travel agents 通用 Skill 项目方案
 
 ## 1. 定位
 
-`agent-travel4me` 是一个面向通用 coding agent 的 skill，不绑定 Codex，也不提供独立客户端。它是一组可被 coding agent 加载的指令、脚本和素材：
+`travel agents` 是一个面向通用 coding agent 的 skill，不绑定 Codex，也不提供独立客户端。它是一组可被 coding agent 加载的指令、脚本和素材：
 
 - skill 负责和用户对话、做旅行规划、组织 prompt、调用脚本。
 - 本地脚本负责生成图片、裁切壁纸、保存状态、尝试设置系统壁纸。
@@ -562,7 +562,7 @@ GeoJSON 输出：
 ## 11. 推荐目录结构
 
 ```text
-agent-travel4me/
+travel-agents/
 ├── SKILL.md
 ├── scripts/
 │   ├── init_trip.py

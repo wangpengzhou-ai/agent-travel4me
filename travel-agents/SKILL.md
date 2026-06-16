@@ -1,9 +1,9 @@
 ---
-name: agent-travel4me
-description: "Plan and run an Agent travels for me journey, and directly generate strict postcard-style travel images when the user asks for postcards/images for specified places. Supports origin/destination setup, recurring Agent traveler identity, route scenes, prompts, optional images, wallpaper resizing, wallpaper setting, and route data export."
+name: travel-agents
+description: "Plan and run a travel agents journey, and directly generate strict postcard-style travel images when the user asks for postcards/images for specified places. Supports origin/destination setup, recurring Agent traveler identity, route scenes, prompts, optional images, wallpaper resizing, wallpaper setting, and route data export."
 ---
 
-# agent-travel4me
+# travel agents
 
 Use this skill when the user wants an AI Agent to "travel for me" and maintain a multi-day journey along a route.
 
@@ -17,12 +17,14 @@ Supported adapter categories:
 
 - Native image tool adapter: call the host agent's image-generation tool directly from the current turn when it is available, then update local state if the tool returns a local image path.
 - API provider adapter: local scripts generate through configured API keys or command hooks.
-- Automation adapter: create the daily run automation by default after a durable trip is initialized. Use host agent reminder/automation first when available; use OS schedulers only when local scripts can complete the run without the host agent.
+- Automation adapter: create the daily run automation by default after a durable trip is initialized. Use host agent reminder/automation first when images require the host agent's native image tool. Use OS schedulers only when local scripts can complete image generation without the host agent through a configured local API provider or `TRAVEL_AGENTS_IMAGE_COMMAND`.
 - Weather adapter: host weather/search tool first when available; otherwise use a user-provided weather summary or a configured weather command.
+
+`detect_environment.py` cannot see host-platform automation tools. The coding agent must inspect its currently available tools before falling back to OS schedulers. In Codex, use the `automation_update` tool to create a real platform automation; do not simulate it with shell commands, cron text, or hand-written automation files.
 
 ## Overview
 
-`agent-travel4me` turns a user's travel wish into a local, multi-day Agent journey. The agent acts as a small recurring traveler moving from an origin to a destination. For each day, the workflow chooses a waypoint, builds a scene prompt with recognizable local details, can optionally generate an image, and advances the trip state.
+`travel agents` turns a user's travel wish into a local, multi-day Agent journey. The agent acts as a small recurring traveler moving from an origin to a destination. For each day, the workflow chooses a waypoint, builds a scene prompt with recognizable local details, can optionally generate an image, and advances the trip state.
 
 The route is a visually coherent, geographically plausible narrative arc for daily postcard-style scenes. The main deliverable is durable journey state, route data, daily scene prompts, and optional visual artifacts. Desktop wallpaper is one supported presentation option.
 
@@ -38,7 +40,7 @@ For this fast path:
 2. Resolve small ambiguities quickly. If the user gives a count that conflicts with the listed locations, prefer the explicit location list and mention the mismatch.
 3. Build one compact prompt per requested image using the fixed watercolor postcard contract: 16:9, one small off-center recurring traveler, environment-first composition, varied solo/small-interaction/crowd-context activity, and exactly one upper-left `Place    Month D, YYYY` label.
 4. If the user supplies a character image, keep that character as the identity lock and only add small recurring accessories when allowed.
-5. Call the host image-generation tool directly after the first prompt is ready. In Codex, use `image_gen` / `imagegen`; do not first reason through the full trip-state workflow, inspect files, or run shell commands.
+5. Call the host image-generation tool directly after the first prompt is ready. In Codex, use `image_gen` / `imagegen`; do not first reason through the full trip-state workflow, inspect files, or run shell commands. When the host image tool accepts image/reference inputs and the skill files are available, attach `assets/style_samples/upper-left-label-date-reference.png` as the label reference. If the host image tool is prompt-only, do not claim that the label reference image was used.
 6. For multiple locations, generate images sequentially, one tool call per location, so the user sees progress quickly.
 7. After generation, report the generated images. Import into local trip state only if the user asked for durable trip files or the host tool reports a local image path and the existing trip directory is already known.
 
@@ -94,7 +96,7 @@ Avoid abstract role-only candidates such as "quiet mapkeeper", "little observer"
 
 ## Expected Outputs
 
-A complete run should create or update a trip directory under `~/.agent-travel4me/trips/<trip_id>/` with:
+A complete run should create or update a trip directory under `~/.travel-agents/trips/<trip_id>/` with:
 
 - `trip.json`: durable trip state, current day, style, character identity, and waypoints.
 - `character.json`: durable Agent identity lock, visual anchors, and consistency rules.
@@ -174,7 +176,7 @@ python scripts/init_trip.py \
   --character-anchor "<fixed color/accessory/shape detail>"
 ```
 
-This writes `trip.json`, `route.geojson`, prompts, and state under `~/.agent-travel4me/trips/<trip_id>/` by default.
+This writes `trip.json`, `route.geojson`, prompts, and state under `~/.travel-agents/trips/<trip_id>/` by default.
 
 If coordinates are known or supplied by a geocoder, pass them with `--origin-lat`, `--origin-lon`, `--destination-lat`, and `--destination-lon`. If not, the route is marked `needs_enrichment`; the coding agent must enrich waypoints with real places, landmarks, local visual elements, and coordinates before live image generation.
 
@@ -206,9 +208,20 @@ Ask user to confirm the resulting reference before generating daily scene images
 
 ### 4. Create Daily Automation
 
-After the trip exists and before or immediately after the first daily scene, create the daily automation when an adapter is available. Prefer host agent automation/reminders when the host provides them. Use `scripts/install_schedule.py` for OS schedulers only when local scripts can run the daily image workflow without the host agent.
+After the trip exists and before or immediately after the first daily scene, create the daily automation when an adapter is available. Prefer host agent automation/reminders when the host provides them. Use `scripts/install_schedule.py` for OS schedulers only when local scripts can run the daily image workflow without the host agent through a configured local API provider or `TRAVEL_AGENTS_IMAGE_COMMAND`.
 
 Do not ask whether to create automation. Ask only if a tool, platform, or operating system approval dialog is required. If no automation adapter exists, report that daily generation will require manual runs until one is configured.
+
+For Codex:
+
+- If the daily postcard requires Codex host-native image generation, call `automation_update` with a thread heartbeat so this thread wakes up and the agent can run the dry-run, call the image tool, and update trip state.
+- Use a detached cron automation only when the workflow can run stand-alone from local files, such as with a configured local image provider or `TRAVEL_AGENTS_IMAGE_COMMAND`.
+- Treat the returned automation id/status from `automation_update` as the proof of creation. Do not report success before the tool call succeeds.
+- Do not write raw automation config files or print schedule text as a substitute for the platform automation tool.
+
+Never claim a daily automation was created unless the host automation tool or local scheduler install command actually succeeded. If `install_schedule.py` prints a cron or `schtasks` line with `NOT INSTALLED`, that is only a manual setup artifact and must be reported as not installed.
+
+If the current environment has host-native image generation but no local image provider, an OS scheduler is not enough for daily postcards: `daily_run.py` can write the prompt, but the host agent must be woken by platform automation to call the image tool and generate the postcard.
 
 For supported local OS schedulers:
 
@@ -243,7 +256,8 @@ python scripts/daily_run.py \
   --trip-dir <trip_dir> \
   --weather "<daily local weather summary>" \
   --label-location "<short place label>" \
-  --dry-run
+  --dry-run \
+  --json
 ```
 
 Live run with a local API provider or configured image command:
@@ -257,9 +271,10 @@ python scripts/daily_run.py \
 
 Live run with a host agent native image tool:
 
-1. Run the dry-run command and read `day_###/prompt.txt`.
-2. Call the host image-generation tool directly with that exact prompt. In Codex, use the `image_gen` / `imagegen` tool when it is available; do not describe this as a request for the user or for another agent to perform later.
-3. If the host tool reports a saved local image path, import that exact generated file:
+1. Run the dry-run command and read both `day_###/prompt.txt` and the dry-run JSON/`day_###/metadata.json`.
+2. Use `metadata.reference_image_paths` as the required reference input list. The first image is always the upper-left label reference. If the host tool accepts image/reference inputs, attach those files when calling the image-generation tool. If it does not, state clearly that the run is prompt-only and the label reference image was not used.
+3. Call the host image-generation tool directly with the exact prompt and the reference images above. In Codex, use the `image_gen` / `imagegen` tool when it is available; do not describe this as a request for the user or for another agent to perform later.
+4. If the host tool reports a saved local image path, import that exact generated file:
 
 ```bash
 python scripts/import_generated_image.py \

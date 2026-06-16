@@ -18,6 +18,10 @@ def generate_for_day(trip_dir: Path, day: int, size: str = "2560x1440", dry_run:
     day_dir.mkdir(parents=True, exist_ok=True)
     prompt_context = build_prompt_context(trip, waypoint)
     label_sample = label_sample_path()
+    character_reference = trip_dir / "character_reference.png"
+    reference_images = [label_sample]
+    if character_reference.exists():
+        reference_images.append(character_reference)
 
     metadata = {
         "day": day,
@@ -26,6 +30,7 @@ def generate_for_day(trip_dir: Path, day: int, size: str = "2560x1440", dry_run:
         "label_date": prompt_context["label_date"],
         "weather": waypoint.get("weather"),
         "label_sample_path": str(label_sample),
+        "reference_image_paths": [str(path) for path in reference_images],
         "created_at": utc_now(),
         "prompt_path": str(day_dir / "prompt.txt"),
         "size": size,
@@ -54,11 +59,6 @@ def generate_for_day(trip_dir: Path, day: int, size: str = "2560x1440", dry_run:
 
     original = day_dir / "original.png"
     wallpaper = day_dir / "wallpaper.png"
-    character_reference = trip_dir / "character_reference.png"
-    reference_images = [label_sample]
-    if character_reference.exists():
-        reference_images.append(character_reference)
-    metadata["reference_image_paths"] = [str(path) for path in reference_images]
     try:
         provider_meta = generate_image(prompt, original, size=size, reference_images=reference_images)
         resize_wallpaper(original, wallpaper, *[int(x) for x in size.split("x", 1)])

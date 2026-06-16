@@ -18,7 +18,7 @@ def build_character_prompt(character: dict | str, style: str) -> str:
         anchors = [description]
         rules = []
     lines = [
-        "Create a character reference image for agent-travel4me.",
+        "Create a character reference image for travel agents.",
         f"Character: {description}.",
     ]
     if anchors:

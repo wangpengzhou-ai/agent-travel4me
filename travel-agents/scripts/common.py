@@ -11,7 +11,9 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_STATE_DIR = Path(os.environ.get("AGENT_TRAVEL4ME_HOME", "~/.agent-travel4me")).expanduser()
+DEFAULT_STATE_DIR = Path(
+    os.environ.get("TRAVEL_AGENTS_HOME") or os.environ.get("AGENT_TRAVEL4ME_HOME") or "~/.travel-agents"
+).expanduser()
 
 
 def slugify(value: str) -> str:

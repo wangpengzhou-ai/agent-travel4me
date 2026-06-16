@@ -11,14 +11,26 @@ from common import print_json
 from detect_screen import detect_screen
 
 
+def _truthy_env(*names: str) -> bool:
+    return any(os.environ.get(name) in {"1", "true", "yes"} for name in names)
+
+
+def _env_value(*names: str) -> str | None:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
 def provider_status() -> dict[str, Any]:
-    native = os.environ.get("TRAVEL4ME_NATIVE_IMAGE_TOOL") in {"1", "true", "yes"}
+    native = _truthy_env("TRAVEL_AGENTS_NATIVE_IMAGE_TOOL", "TRAVEL4ME_NATIVE_IMAGE_TOOL")
     providers = []
     if os.environ.get("OPENAI_API_KEY"):
         providers.append({"name": "openai", "model": os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-2"), "priority": 1})
     if os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"):
         providers.append({"name": "gemini", "model": os.environ.get("GEMINI_IMAGE_MODEL", "gemini-3-pro-image-preview"), "priority": 2})
-    if os.environ.get("SEEDREAM_API_KEY") or os.environ.get("TRAVEL4ME_IMAGE_COMMAND"):
+    if os.environ.get("SEEDREAM_API_KEY") or _env_value("TRAVEL_AGENTS_IMAGE_COMMAND", "TRAVEL4ME_IMAGE_COMMAND"):
         providers.append({"name": "seedream", "model": os.environ.get("SEEDREAM_MODEL", "latest"), "priority": 3})
     providers.sort(key=lambda x: x["priority"])
     return {
@@ -59,38 +71,59 @@ def wallpaper_status() -> dict[str, Any]:
     return {"platform": system, "adapter": None, "available": False}
 
 
-def automation_status() -> dict[str, Any]:
+def automation_status(provider: dict[str, Any]) -> dict[str, Any]:
     system = platform.system()
     candidates = []
-    if os.environ.get("TRAVEL4ME_AGENT_AUTOMATION") in {"1", "true", "yes"}:
+    local_scheduler_candidates = []
+    host_agent_automation_hint = _truthy_env("TRAVEL_AGENTS_AGENT_AUTOMATION", "TRAVEL4ME_AGENT_AUTOMATION")
+    if host_agent_automation_hint:
         candidates.append("agent_platform_automation")
+    has_local_image_provider = bool(provider["available_api_providers"])
     if system == "Darwin" and shutil.which("launchctl"):
-        candidates.append("launchd")
+        local_scheduler_candidates.append("launchd")
     if system == "Windows" and shutil.which("schtasks"):
-        candidates.append("windows_task_scheduler")
+        local_scheduler_candidates.append("windows_task_scheduler")
     if system == "Linux":
         if shutil.which("systemctl"):
-            candidates.append("systemd_timer")
+            local_scheduler_candidates.append("systemd_timer")
         if shutil.which("crontab"):
-            candidates.append("cron")
+            local_scheduler_candidates.append("cron")
+    if has_local_image_provider:
+        candidates.extend(local_scheduler_candidates)
+    if "agent_platform_automation" in candidates:
+        default_action = "create_host_agent_daily_automation_after_trip_initialization"
+    elif candidates:
+        default_action = "install_local_daily_scheduler_after_trip_initialization"
+    else:
+        default_action = "check_host_agent_automation_tool_or_manual_daily_run_until_configured"
     return {
         "available": bool(candidates),
         "candidates": candidates,
-        "default_action": "create_daily_automation_after_trip_initialization" if candidates else "manual_daily_run_until_configured",
+        "host_agent_automation": {
+            "python_can_verify": False,
+            "hint": host_agent_automation_hint,
+            "agent_action": "inspect_current_host_tools_and_call_real_automation_tool_when_available",
+        },
+        "local_scheduler_candidates": local_scheduler_candidates,
+        "local_scheduler_requires": "local_image_provider_or_TRAVEL_AGENTS_IMAGE_COMMAND",
+        "local_scheduler_available": bool(local_scheduler_candidates and has_local_image_provider),
+        "host_agent_required_for_images": not has_local_image_provider,
+        "default_action": default_action,
         "ask_user_first": False,
     }
 
 
 def detect_environment() -> dict[str, Any]:
+    provider = provider_status()
     return {
         "platform": platform.platform(),
         "python": platform.python_version(),
         "shell": bool(shutil.which("sh") or shutil.which("bash") or shutil.which("zsh") or shutil.which("powershell")),
-        "provider": provider_status(),
+        "provider": provider,
         "desktop_session": desktop_session(),
         "screen": detect_screen(),
         "wallpaper": wallpaper_status(),
-        "automation": automation_status(),
+        "automation": automation_status(provider),
     }
 
 

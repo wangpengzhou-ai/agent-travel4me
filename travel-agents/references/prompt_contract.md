@@ -42,6 +42,7 @@ Rules:
 - Do not use all-caps place names, slash separators, uppercase month abbreviations, or `DAY XX` labels.
 - Prefer short label locations when the route location name is too long.
 - Use the label-only reference for runtime image references; do not pass the full postcard sample only to control label lettering.
+- Mentioning the label reference path in the prompt is not enough. When the image tool supports image/reference inputs, attach `assets/style_samples/upper-left-label-date-reference.png` as an actual input image; otherwise report that the run was prompt-only.
 
 ## Weather Context
 

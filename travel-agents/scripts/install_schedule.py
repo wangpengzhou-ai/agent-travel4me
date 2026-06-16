@@ -37,7 +37,7 @@ def launchd_plist(name: str, trip_dir: Path, hour: int, minute: int, skill_dir: 
 
 def _default_name(trip_dir: Path) -> str:
     suffix = re.sub(r"[^a-zA-Z0-9_.-]+", "-", trip_dir.name).strip("-") or "trip"
-    return f"com.agent-travel4me.daily.{suffix}"
+    return f"com.travel-agents.daily.{suffix}"
 
 
 def _install_launchd(name: str, content: str) -> Path:
@@ -49,8 +49,17 @@ def _install_launchd(name: str, content: str) -> Path:
     return plist_path
 
 
+def _daily_run_command(trip_dir: Path, skill_dir: Path) -> str:
+    daily_run = skill_dir / "scripts" / "daily_run.py"
+    return f"{os.environ.get('PYTHON', 'python3')} {daily_run} --trip-dir {trip_dir}"
+
+
+def _manual_only(message: str, command: str) -> str:
+    return f"# NOT INSTALLED: {message}\n{command}"
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create or print a daily scheduler setup artifact.")
+    parser = argparse.ArgumentParser(description="Install a supported daily scheduler or print a manual setup artifact.")
     parser.add_argument("--trip-dir", required=True)
     parser.add_argument("--hour", type=int, default=9)
     parser.add_argument("--minute", type=int, default=0)
@@ -73,11 +82,23 @@ def main() -> None:
         else:
             print(content)
     elif system == "Linux":
-        daily_run = skill_dir / "scripts" / "daily_run.py"
-        print(f"{args.minute} {args.hour} * * * {os.environ.get('PYTHON', 'python3')} {daily_run} --trip-dir {trip_dir}")
+        if args.install:
+            raise SystemExit(
+                "install_schedule.py does not install Linux schedulers. "
+                "Use host agent automation when image generation depends on host-native tools, "
+                "or install this cron line manually only when local image providers are configured."
+            )
+        command = f"{args.minute} {args.hour} * * * {_daily_run_command(trip_dir, skill_dir)}"
+        print(_manual_only("Linux cron line for manual setup only.", command))
     elif system == "Windows":
-        daily_run = skill_dir / "scripts" / "daily_run.py"
-        print(f'schtasks /Create /SC DAILY /TN agent-travel4me /TR "python {daily_run} --trip-dir {trip_dir}" /ST {args.hour:02d}:{args.minute:02d}')
+        if args.install:
+            raise SystemExit(
+                "install_schedule.py does not install Windows scheduled tasks. "
+                "Use host agent automation when image generation depends on host-native tools, "
+                "or run the printed schtasks command yourself only when local image providers are configured."
+            )
+        command = f'schtasks /Create /SC DAILY /TN travel-agents /TR "{_daily_run_command(trip_dir, skill_dir)}" /ST {args.hour:02d}:{args.minute:02d}'
+        print(_manual_only("Windows schtasks command for manual setup only.", command))
     else:
         raise SystemExit(f"unsupported platform {system}")
 

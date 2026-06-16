@@ -1,4 +1,0 @@
-interface:
-  display_name: "Agent Travel4me"
-  short_description: "Start and run an agent travel journey"
-  default_prompt: "Use $agent-travel4me to start a new Agent-travels-for-me journey, ask the first setup questions, and recommend three concrete Agent identity candidates."

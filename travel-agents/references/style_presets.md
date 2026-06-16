@@ -28,4 +28,4 @@ Match `assets/style_samples/upper-left-label-date-reference.png`:
 - Use full written dates with month name, day, comma, and year.
 - Do not use slash separators, uppercase month abbreviations, or `DAY XX`.
 
-Use the label-only reference for runtime image references. Do not pass the full postcard sample merely to control label lettering, because the full scene can bleed its style, subject, and composition into later generations.
+Use the label-only reference for runtime image references. Do not pass the full postcard sample merely to control label lettering, because the full scene can bleed its style, subject, and composition into later generations. Prompt text that names the reference path is not enough; attach the label reference as an image input when the image tool supports references.

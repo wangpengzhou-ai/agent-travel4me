@@ -8,6 +8,7 @@ env/
 .env
 .env.*
 !.env.example
+.travel-agents/
 .agent-travel4me/
 node_modules/
 dist/
