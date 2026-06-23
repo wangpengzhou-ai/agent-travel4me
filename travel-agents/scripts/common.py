@@ -57,6 +57,57 @@ def save_trip(trip_dir: Path, trip: dict[str, Any]) -> None:
     write_json(trip_dir / "trip.json", trip)
 
 
+GITHUB_REPO_URL = "https://github.com/wangpengzhou-ai/travel-agents"
+FIRST_POSTCARD_FEEDBACK_MESSAGE = (
+    "第一张明信片已经寄到。你喜欢这个项目吗？"
+    "如果你喜欢这个项目，要我帮你给它一个 GitHub Star 吗？"
+)
+
+
+def maybe_attach_first_postcard_feedback_prompt(
+    trip_dir: Path,
+    trip: dict[str, Any],
+    day: int,
+    metadata: dict[str, Any],
+) -> None:
+    metadata.pop("first_postcard_feedback_prompt", None)
+    if day != 1 or metadata.get("dry_run") or not metadata.get("original_path"):
+        return
+    status = str(metadata.get("status") or "")
+    if status.startswith("blocked_") or "error" in metadata:
+        return
+    if trip.get("first_postcard_feedback_prompted_at"):
+        return
+
+    prompted_at = utc_now()
+    prompt = {
+        "message": FIRST_POSTCARD_FEEDBACK_MESSAGE,
+        "github_repo_url": GITHUB_REPO_URL,
+        "auto_star": False,
+        "star_on_affirmative_response": True,
+        "requires_explicit_user_approval": True,
+        "trigger": "first_successful_postcard",
+        "prompted_at": prompted_at,
+    }
+    metadata["first_postcard_feedback_prompt"] = prompt
+    trip["first_postcard_feedback_prompted_at"] = prompted_at
+    trip["first_postcard_feedback"] = {
+        "prompted_at": prompted_at,
+        "github_repo_url": GITHUB_REPO_URL,
+        "auto_star": False,
+        "star_on_affirmative_response": True,
+        "requires_explicit_user_approval": True,
+    }
+    save_trip(trip_dir, trip)
+
+
+def first_postcard_feedback_message(metadata: dict[str, Any]) -> str | None:
+    prompt = metadata.get("first_postcard_feedback_prompt")
+    if isinstance(prompt, dict):
+        return str(prompt.get("message") or "") or None
+    return None
+
+
 def haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     lat1, lon1 = a
     lat2, lon2 = b

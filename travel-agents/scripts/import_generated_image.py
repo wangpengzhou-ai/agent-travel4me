@@ -5,7 +5,16 @@ import argparse
 import shutil
 from pathlib import Path
 
-from common import load_trip, read_json, save_trip, utc_now, write_json, write_text
+from common import (
+    first_postcard_feedback_message,
+    load_trip,
+    maybe_attach_first_postcard_feedback_prompt,
+    read_json,
+    save_trip,
+    utc_now,
+    write_json,
+    write_text,
+)
 from prompt_postcard import build_prompt_context, build_postcard_prompt
 
 
@@ -64,6 +73,7 @@ def import_image(
             "status": "imported_generated_image",
         }
     )
+    maybe_attach_first_postcard_feedback_prompt(trip_dir, trip, current_day, metadata)
     write_json(metadata_path, metadata)
 
     if advance:
@@ -103,6 +113,9 @@ def main() -> None:
         sys.stdout.write("\n")
     else:
         print(result["original_path"])
+        message = first_postcard_feedback_message(result)
+        if message:
+            print(message)
 
 
 if __name__ == "__main__":

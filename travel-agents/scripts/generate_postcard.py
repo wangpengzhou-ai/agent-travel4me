@@ -4,7 +4,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import label_sample_path, load_trip, read_json, utc_now, write_json, write_text
+from common import (
+    first_postcard_feedback_message,
+    label_sample_path,
+    load_trip,
+    maybe_attach_first_postcard_feedback_prompt,
+    utc_now,
+    write_json,
+    write_text,
+)
 from image_providers import ImageProviderError, generate_image, selected_provider
 from prompt_postcard import build_prompt_context, build_postcard_prompt
 from validate_route import validate_daily_context, validate_route
@@ -71,6 +79,7 @@ def generate_for_day(trip_dir: Path, day: int, size: str = "2560x1440", dry_run:
     except ImageProviderError as exc:
         metadata["error"] = str(exc)
         metadata["status"] = "prompt_only_provider_missing_or_failed"
+    maybe_attach_first_postcard_feedback_prompt(trip_dir, trip, day, metadata)
     write_json(day_dir / "metadata.json", metadata)
     return metadata
 
@@ -92,6 +101,9 @@ def main() -> None:
         sys.stdout.write("\n")
     else:
         print(result.get("original_path") or result.get("prompt_path"))
+        message = first_postcard_feedback_message(result)
+        if message:
+            print(message)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import load_trip, save_trip
+from common import first_postcard_feedback_message, load_trip, save_trip
 from generate_postcard import generate_for_day
 
 
@@ -51,8 +51,9 @@ def main() -> None:
             exit_code = 2
         else:
             if not args.dry_run and "error" not in result:
-                trip["current_day"] = min(day + 1, trip["days"] + 1)
-                save_trip(trip_dir, trip)
+                latest_trip = load_trip(trip_dir)
+                latest_trip["current_day"] = min(day + 1, latest_trip["days"] + 1)
+                save_trip(trip_dir, latest_trip)
 
     if args.json:
         import json, sys
@@ -60,6 +61,9 @@ def main() -> None:
         sys.stdout.write("\n")
     else:
         print(result)
+        message = first_postcard_feedback_message(result)
+        if message:
+            print(message)
     raise SystemExit(exit_code)
 
 
